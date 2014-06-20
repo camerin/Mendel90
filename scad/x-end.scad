@@ -20,10 +20,9 @@ bearing_dia = Z_bearings[1];
 bearing_width = bearing_dia + 2 * bwall;
 bearing_depth = bearing_width / 2 + 1;
 bearing_length = Z_bearings[0];
-bearing_safe_offset=10;
+
 shelf_thickness = 2;
 shelf_clearance = 0.5;
-z_block_keep_out=10;
 
 bearing_height = max( min(65, 2.8 * bearing_length), 2 * (bearing_length + shelf_clearance) + 3 * shelf_thickness);
 
@@ -256,24 +255,17 @@ module x_end_bracket(motor_end, integral_support = false){
 
         difference(){
             union(){
-
-//////////////////////////////////////////////////////////////////////////////////////
                 // base
-//////////////////////////////////////////////////////////////////////////////////////
                 translate([front - length / 2, 0, 0])
                     rounded_rectangle([length, width, thickness], corner_rad);
 
                 // nut holder tower
                 difference() {
-                    union(){
-								translate([front - z_block_keep_out / 2 - length / 2, 0, bearing_height / 2 - thickness / 2])
-                        	cube([length-z_block_keep_out, bearing_width, bearing_height+bearing_safe_offset], true);
-	                    translate([front - length / 2, 0, bearing_height / 2 - thickness / 2])
-                      	  cube([length, bearing_width, bearing_height], true);
-							}
+                    translate([front - length / 2, 0, bearing_height / 2 - thickness / 2])
+                        cube([length, bearing_width, bearing_height], true);
 
-                    translate([-bearing_depth - length / 2 - eta, 0, nut_shelf - bearing_height / 2 + bearing_safe_offset])
-                        rounded_rectangle([length, bearing_width - 2 * web, bearing_height-bearing_safe_offset], 2);
+                    translate([-bearing_depth - length / 2 - eta, 0, nut_shelf - bearing_height / 2])
+                        rounded_rectangle([length, bearing_width - 2 * web, bearing_height], 2);
                 }
                 if(motor_end)
                     //
@@ -329,22 +321,19 @@ module x_end_bracket(motor_end, integral_support = false){
             //
             translate([0, 0, bearing_height / 2 - thickness / 2])
                 cube([bearing_depth * 2 -eta, bearing_width - 1, bearing_height + 2], center = true);
-
-/////////////////////////////////////////////////////////////////////////////////////
             //
             // Hole for z leadscrew
             //
-/////////////////////////////////////////////////////////////////////////////////////
             difference() {
-                translate([-z_bar_offset(), 0,bearing_safe_offset/2 - thickness / 2])
-                    nut_trap((Z_screw_dia + 1) / 2, Z_nut_radius, nut_shelf +thickness / 2 + nut_trap_depth(Z_nut), supported = integral_support);
-					
+                translate([-z_bar_offset(), 0, - thickness / 2])
+                    nut_trap((Z_screw_dia + 1) / 2, Z_nut_radius, nut_shelf + thickness / 2 + nut_trap_depth(Z_nut), supported = integral_support);
+
                 if(integral_support)
-                    translate([-z_bar_offset(), 0,-bearing_safe_offset/2+ nut_shelf])
+                    translate([-z_bar_offset(), 0, nut_shelf])
                         cylinder(r = Z_nut_radius + 1, h = 2 * layer_height, center = true);
             }
 
-            *translate([-z_bar_offset(), 0, -thickness / 2 - 1])
+            translate([-z_bar_offset(), 0, -thickness / 2 - 1])
                 cylinder(r = Z_nut_radius + 1, h = thickness + 2, $fn = 6);
 
             for(side = [-1, 1]) {
@@ -612,7 +601,7 @@ module x_idler_support_x2_stl() facing_pair(-1) x_idler_support_stl();
 if(0)
     x_ends_stl();
 else
-    if(1)
+    if(0)
         x_end_assembly(false);
     else
         mirror ([1,0,0]) x_end_assembly(true);
