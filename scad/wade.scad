@@ -254,6 +254,287 @@ module wades_block_stl() {
                         poly_cylinder(h = 30, r = M3_clearance_radius);                  // retaining screws
     }
 }
+module wades_bowden_block_stl() {
+    stl("wades_block");
+
+    insulator = hot_end_insulator_diameter(hot_end);
+    screw_pitch = hot_end_screw_pitch(hot_end);
+    insulator_depth = hot_end_inset(hot_end);
+    nut_clearance = 2 * nut_thickness(M4_nut);
+
+    nut_slot = nut_thickness(M4_nut) + 0.3;
+
+
+    difference(){
+        union(){
+            cube([81, height, thickness]);                                  // motor plate
+            cube([filament_x + 25 - 3.5, base_thickness, width]);           // base
+            translate([filament_x + 25 - 3.5, base_thickness / 2, filament_z])
+                intersection() {
+                    union() {
+                        for(a = [-90, 90])
+                            rotate([a, 0, 0])
+                                teardrop(r = 10.6, h = base_thickness, truncate = false, center = true);
+                    }
+                    cube([22, base_thickness + 1, width], center = true);
+                }
+            translate([bearing_housing_x, 0, 0])
+                cube([bearing_housing_depth, height, width]);               // bearing housing
+
+            translate([80,1.5,0])                                           // fillet
+                cube([11,11, width]);
+
+            if(extension)
+                translate([filament_x - extension_width / 2, -extension + extension_clearance + eta, 0])
+                    intersection() {
+                        cube([extension_width, extension - extension_clearance, width]);
+                        translate([extension_width / 2, extension / 2, filament_z])
+                            rotate([-90, 0, 0])
+                                teardrop(r = extension_rad, h = extension + 1, center = true);
+                    }
+        }
+
+        translate([-11,-1,30]) rotate([0,60,0]) cube([30, base_thickness + 2, 60]);             // slope on base
+
+
+        translate([filament_x, 20, filament_z])
+            rotate([90,0,0])
+                teardrop(h = 70, r=4/2, center=true);                       // filament
+
+        // mounting holes
+        for(side = [-1, 1])
+            translate([filament_x + mount_pitch * side, base_thickness, filament_z])
+                rotate([90,0,0])
+                    nut_trap(M4_clearance_radius, M4_nut_radius, 3, true);
+
+        // pressure screws
+        for(i = [0, 1]) {
+            translate([bearing_housing_x + nut_inset + nut_slot / 2, pscrew_y[i], pscrew_z[i]]) {
+                rotate([-90, 90, 90])
+                    nut_trap(0, M4_nut_radius, nut_slot / 2, true);
+
+                rotate([180 + 180 * i, 0, 0])
+                    translate([0, 0, 5])
+                        cube([nut_slot, nut_flat_radius(M4_nut) * 2, 10], center = true);
+
+            }
+
+            translate([bearing_housing_x - 4,   pscrew_y[i], pscrew_z[i]])
+                rotate([90,0,90])
+                    teardrop(h = bearing_housing_depth + 10, r = 4.4 / 2);
+
+        }
+        //
+        // holes for motor
+        //
+        translate([motor_x, motor_y, -1]) {
+            slot(r = NEMA_big_hole(NEMA17), l = motor_leeway, h = 10, center = false);      // motor hub slot
+
+            for(x = NEMA_holes(NEMA17))                                                     // motor screw slots
+                for(y = NEMA_holes(NEMA17))
+                    translate([x,y,0])
+                        slot(r = M3_clearance_radius, l = motor_leeway, h = 10, center = false);
+        }
+
+        //
+        // remove fourth motor slot
+        //
+        translate([motor_x - 40 + motor_leeway / 2, motor_y - NEMA_big_hole(NEMA17), -1])
+            cube([40, 32, 7]);
+
+        translate([motor_x - 40 + motor_leeway / 2 + 6, motor_y, -1])
+            cube([40, 32, 7]);
+
+        translate([-1,-1,-1]) cube([12,60,30]);              // truncates tail
+
+        translate([11, 0, -1])
+            fillet(4, 30);
+
+        translate([11, motor_y - NEMA_big_hole(NEMA17), -1])
+            rotate([0, 0, -90])
+                fillet(4, 30);
+
+        translate([motor_x + motor_leeway / 2 + 6, height, -1])
+            rotate([0, 0, -90])
+                fillet(4, 30);
+
+        //
+        // hole for hobbed bolt
+        //
+        difference() {
+            translate([driven_x,     driven_y, 7 + layer_height + eta])
+                poly_cylinder(r = M8_clearance_radius + 0.25, h = 30);
+
+            translate([driven_x + 2, driven_y - 5, filament_z + 4 - eta])
+                cube([10, 10, layer_height + eta]); // support bridge
+        }
+        //
+        // Sockets for bearings
+        //
+        translate([driven_x,       driven_y, width - 7])       b608(8);                // top bearing socket
+        translate([filament_x + 8, driven_y, filament_z - 4])  b608(8);                // clearance for idler
+        translate([driven_x,       driven_y, -1 + eta])        b608(8);                // bottom bearing socket
+
+        //
+        // Hole for hot end
+        //
+        translate([filament_x, -extension + eta, filament_z])
+            rotate([90,0,0]) {
+                if(hot_end_groove_mount(hot_end)) assign(relief = 0.5) {
+
+                    translate([0, 0, -insulator_depth + jhead_groove_offset() / 2 + eta])         // slot for the flange
+                        keyhole(insulator / 2, jhead_groove_offset(), width - filament_z);
+
+                    translate([0, 0, -insulator_depth + relief / 2])
+                        keyhole(insulator / 2 + 0.5, relief, width - filament_z);           // relief to avoid corner radius
+                    //
+                    // Screw holes and nut traps
+                    //
+                    for(i = [0:2])
+                         rotate([0, 0, i * 120 + jhead_screw_angle])
+                            translate([jhead_screw_pitch, 0, 0])
+                                rotate([0, 0, -i * 120 - jhead_screw_angle]) {
+                                    teardrop_plus(r = screw_clearance_radius(jhead_screw), h = jhead_screw_length * 2, center = true);
+                                    translate([0, 0, -base_thickness - extension - jhead_nut_slot / 2]) {
+                                        rotate([0, 0, [0, 30, 30][i]])
+                                            nut_trap(0, nut_radius(screw_nut(jhead_screw)), jhead_nut_slot / 2, horizontal = true);
+
+                                        assign(w = nut_flat_radius(screw_nut(jhead_screw)))
+                                        rotate([0, 0, [-90 ,0, 180][i]])
+                                            translate([-w, 0, -jhead_nut_slot / 2])
+                                                cube([w * 2, 100, jhead_nut_slot], center = false);
+
+                                    }
+
+                                }
+                }
+                else {
+                    teardrop_plus(h = insulator_depth * 2, r = insulator / 2, center = true);      // insulator socket
+                    translate([0, 0, -insulator_depth + 0.5])
+                        teardrop_plus(h = 1 , r = insulator / 2 + 1, center=true);       // relief to avoid radius so end is flat
+                }
+            }
+
+        if(!hot_end_groove_mount(hot_end))
+            for(side = [-1, 1])
+                translate([filament_x + screw_pitch * side, screw_depth - extension, -1])
+                    rotate([0, 0, -90 + 90 * side])
+                        poly_cylinder(h = 30, r = M3_clearance_radius);                  // retaining screws
+    }
+}
+
+module e3d_mount() {
+    stl("E3d Bowden Mount");
+
+    insulator = hot_end_insulator_diameter(hot_end);
+    screw_pitch = hot_end_screw_pitch(hot_end);
+    insulator_depth = hot_end_inset(hot_end);
+    nut_clearance = 2 * nut_thickness(M4_nut);
+
+    nut_slot = nut_thickness(M4_nut) + 0.3;
+
+
+    difference(){
+        union(){
+ // motor plate
+					hull(){
+						translate([50,0,width/2])rotate([-90,0,0])cylinder(r=width/2,h=base_thickness);
+						translate([100,0,width/2])rotate([-90,0,0])cylinder(r=width/2,h=base_thickness);
+					}
+            if(extension)
+                translate([filament_x - extension_width / 2, -extension + extension_clearance + eta, 0])
+                    intersection() {
+                        cube([extension_width, extension - extension_clearance, width]);
+                        translate([extension_width / 2, extension / 2, filament_z])
+                            rotate([-90, 0, 0])
+                                teardrop(r = extension_rad, h = extension + 1, center = true);
+                    }
+        }
+
+
+
+
+        translate([filament_x, 20, filament_z])
+            rotate([90,0,0])
+                teardrop(h = 70, r=10/2, center=true);                       // filament
+
+        // mounting holes
+        for(side = [-1, 1])
+            translate([filament_x + mount_pitch * side, base_thickness, filament_z])
+                rotate([90,0,0])
+                    nut_trap(M4_clearance_radius, M4_nut_radius, 3, true);
+
+        // pressure screws
+        for(i = [0, 1]) {
+            translate([bearing_housing_x + nut_inset + nut_slot / 2, pscrew_y[i], pscrew_z[i]]) {
+                rotate([-90, 90, 90])
+                    nut_trap(0, M4_nut_radius, nut_slot / 2, true);
+
+                rotate([180 + 180 * i, 0, 0])
+                    translate([0, 0, 5])
+                        cube([nut_slot, nut_flat_radius(M4_nut) * 2, 10], center = true);
+
+            }
+
+            *translate([bearing_housing_x - 4,   pscrew_y[i], pscrew_z[i]])
+                rotate([90,0,90])
+                    teardrop(h = bearing_housing_depth + 10, r = 4.4 / 2);
+
+        }
+
+
+
+
+        //
+        // Hole for hot end
+        //
+        translate([filament_x, -extension + eta, filament_z])
+            rotate([90,0,0]) {
+                if(hot_end_groove_mount(hot_end)) assign(relief = 0.5) {
+
+                    translate([0, 0, -insulator_depth + jhead_groove_offset() / 2 + eta])         // slot for the flange
+                        keyhole(insulator / 2, jhead_groove_offset(), width - filament_z);
+
+                    translate([0, 0, -insulator_depth + relief / 2])
+                        keyhole(insulator / 2 + 0.5, relief, width - filament_z);           // relief to avoid corner radius
+                    //
+                    // Screw holes and nut traps
+                    //
+                    for(i = [0:2])
+                         rotate([0, 0, i * 120 + jhead_screw_angle])
+                            translate([jhead_screw_pitch, 0, 0])
+                                rotate([0, 0, -i * 120 - jhead_screw_angle]) {
+                                    teardrop_plus(r = screw_clearance_radius(jhead_screw), h = jhead_screw_length * 2, center = true);
+                                    translate([0, 0, -base_thickness - extension - jhead_nut_slot / 2]) {
+                                        rotate([0, 0, [0, 30, 30][i]])
+                                            nut_trap(0, nut_radius(screw_nut(jhead_screw)), jhead_nut_slot / 2, horizontal = true);
+
+                                        assign(w = nut_flat_radius(screw_nut(jhead_screw)))
+                                        rotate([0, 0, [-90 ,0, 180][i]])
+                                            translate([-w, 0, -jhead_nut_slot / 2])
+                                                cube([w * 2, 100, jhead_nut_slot], center = false);
+
+                                    }
+
+                                }
+                }
+                else {
+                    teardrop_plus(h = insulator_depth * 2, r = insulator / 2, center = true);      // insulator socket
+                    translate([0, 0, -insulator_depth + 0.5])
+                        teardrop_plus(h = 1 , r = insulator / 2 + 1, center=true);       // relief to avoid radius so end is flat
+                }
+            }
+
+        if(!hot_end_groove_mount(hot_end))
+            *for(side = [-1, 1])
+                translate([filament_x + screw_pitch * side, screw_depth - extension, -1])
+                    rotate([0, 0, -90 + 90 * side])
+                        poly_cylinder(h = 30, r = M3_clearance_radius);                  // retaining screws
+    }
+}
+
+
+
 
 
 spacer_length = 4 * 1.5;
@@ -508,13 +789,14 @@ module wades_assembly(show_connector = true, show_drive = true) {
 }
 
 module wades_extruder_stl() {
-    difference() {
+ 
+	*difference() {
         wades_block_stl();
         *translate([0, driven_y, -1])
             cube(100);
     }
-    translate([96, driven_y + 1, 0]) rotate([0,0,90]) wades_idler_block_stl();
-    translate([motor_max, motor_y, 0]) wades_gear_spacer_stl();
+    *translate([96, driven_y + 1, 0]) rotate([0,0,90]) wades_idler_block_stl();
+    *translate([motor_max, motor_y, 0]) wades_gear_spacer_stl();
 }
 
 module wades_big_gear_x5_stl(){
@@ -527,12 +809,17 @@ module wades_big_gear_x5_stl(){
                 wades_big_gear_stl();
 }
 
+module e3d_bowden_stl(){
+	  rotate([-90,0,0])e3d_mount(); 
 
-if(1)
+}
+
+if(0)
     rotate([90, 0, 0])
         wades_assembly(true);
 else
     if(1)
-        wades_extruder_stl();
+        *e3d_bowden_stl();
+				wades_bowden_block_stl();
     else
         wades_big_gear_x5_stl();
